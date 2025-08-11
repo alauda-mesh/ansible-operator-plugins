@@ -1,0 +1,80 @@
+name: Alauda Release
+
+on:
+  workflow_dispatch:
+  merge_group:
+  push:
+    branches:
+      - 'main'
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+    - main
+
+env:
+  GOPROXY: https://goproxy.cn
+
+jobs:
+  release:
+    runs-on: [self-hosted, linux, x64]
+    env:
+      http_proxy: ${{ vars.HTTP_PROXY }}
+      https_proxy: ${{ vars.HTTPS_PROXY }}
+      no_proxy: ${{ vars.NO_PROXY }}
+
+    steps:
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: "go.mod"
+        cache: false
+
+    - name: Set up Docker Buildx
+      run: |
+        if ! docker buildx ls | grep -q container-builder; then
+          echo "Docker Buildx it not configured correctly!"
+          exit 1
+        fi
+        docker buildx use container-builder
+
+    - name: Docker Login
+      uses: docker/login-action@v3
+      with:
+        registry: build-harbor.alauda.cn
+        username: ${{ secrets.HARBOR_USERNAME }}
+        password: ${{ secrets.HARBOR_PASSWORD }}
+
+    - name: Set the release related variables
+      shell: bash
+      run: |
+        alauda/patch.sh
+
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          # Release tags.
+          echo IMAGE_TAG="${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+        elif [[ $GITHUB_REF == refs/heads/* ]]; then
+          # Branch build.
+          echo IMAGE_TAG="$(echo "${GITHUB_REF#refs/heads/}" | sed -r 's|/+|-|g')" >> $GITHUB_ENV
+        elif [[ $GITHUB_REF == refs/pull/* ]]; then
+          # PR build.
+          ABBREV_TAG="$(git describe --tags --no-abbrev)"
+          echo IMAGE_TAG="${ABBREV_TAG}-pr.$(echo "${GITHUB_REF}" | sed -E 's|refs/pull/([^/]+)/?.*|\1|')" >> $GITHUB_ENV
+        else
+          echo IMAGE_TAG="$(git describe --tags --always)" >> $GITHUB_ENV
+        fi
+
+    - name: Build
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        platforms: "linux/amd64,linux/arm64"
+        push: true
+        file: alauda/Dockerfile
+        tags: |
+          build-harbor.alauda.cn/asm/ansible-operator:${{ env.IMAGE_TAG }}

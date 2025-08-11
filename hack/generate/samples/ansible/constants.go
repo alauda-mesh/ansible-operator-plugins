@@ -544,7 +544,7 @@ const customMetricsTest = `
     container: manager
     pod: "{{ output.resources[0].metadata.name }}"
     command: >
-      bash -c 'curl -k -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" https://localhost:8443/metrics'
+      sh -c 'curl -k -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" https://localhost:8443/metrics'
   register: metrics_output
 
 - name: Assert sanity metrics were created
