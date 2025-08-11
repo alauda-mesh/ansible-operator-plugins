@@ -204,8 +204,10 @@ COPY plugins/ ${HOME}/plugins/
 COPY ansible.cfg /etc/ansible/ansible.cfg
 COPY fixture_collection/ /tmp/fixture_collection/
 USER root
+RUN chown -R 1001:1001 /tmp/fixture_collection
 RUN chmod -R ug+rwx /tmp/fixture_collection
 USER 1001
+RUN chmod -R ug+rwx /tmp/fixture_collection
 RUN ansible-galaxy collection build /tmp/fixture_collection/ --output-path /tmp/fixture_collection/ \
  && ansible-galaxy collection install /tmp/fixture_collection/operator_sdk-test_fixtures-0.0.0.tar.gz
 RUN echo abc123 > /opt/ansible/pwd.yml \
