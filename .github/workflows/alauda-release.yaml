@@ -76,5 +76,7 @@ jobs:
         platforms: "linux/amd64,linux/arm64"
         push: true
         file: alauda/Dockerfile
-        tags: |
+        build-args: |-
+          RUNNER_BASE_REPO=build-harbor.alauda.cn/asm/ansible-operator-plugins/runner-base
+        tags: |-
           build-harbor.alauda.cn/asm/ansible-operator:${{ env.IMAGE_TAG }}
