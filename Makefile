@@ -4,7 +4,7 @@ SHELL = /bin/bash
 # This value must be updated to the release tag of the most recent release, a change that must
 # occur in the release commit. IMAGE_VERSION will be removed once each subproject that uses this
 # version is moved to a separate repo and release process.
-export IMAGE_VERSION = v1.38.1
+export IMAGE_VERSION = v1.38.1-r1
 # Build-time variables to inject into binaries
 export SIMPLE_VERSION := $(shell (test "$(shell git describe --tags)" = "$(shell git describe --tags --abbrev=0)" && echo $(shell git describe --tags)) || echo $(shell git describe --tags --abbrev=0)+git)
 export GIT_VERSION := $(shell git describe --dirty --tags --always)
@@ -16,18 +16,18 @@ export TOOLS_DIR = tools/bin
 export SCRIPTS_DIR = tools/scripts
 REPO = $(shell go list -m)
 BUILD_DIR = .
-export GO_BUILD_ASMFLAGS = all=-trimpath=$(shell dirname $(PWD))
-export GO_BUILD_GCFLAGS = all=-trimpath=$(shell dirname $(PWD))
 export GO_BUILD_LDFLAGS =  \
     -X '$(REPO)/internal/version.Version=$(SIMPLE_VERSION)' \
     -X '$(REPO)/internal/version.GitVersion=$(GIT_VERSION)' \
     -X '$(REPO)/internal/version.GitCommit=$(GIT_COMMIT)' \
     -X '$(REPO)/internal/version.KubernetesVersion=v$(K8S_VERSION)' \
     -X '$(REPO)/internal/version.ImageVersion=$(IMAGE_VERSION)' \
+    -X runtime.buildVersion=unknown \
+    -X runtime.modinfo= \
  \
 
 GO_BUILD_ARGS = \
-  -gcflags "$(GO_BUILD_GCFLAGS)" -asmflags "$(GO_BUILD_ASMFLAGS)" -ldflags "$(GO_BUILD_LDFLAGS)"
+  -trimpath -ldflags "$(GO_BUILD_LDFLAGS)"
 
 export GO111MODULE = on
 export CGO_ENABLED = 0
@@ -99,6 +99,11 @@ endif
 image/%: export DOCKER_CLI_EXPERIMENTAL = enabled
 image/%:
 	docker buildx build $(DOCKER_PROGRESS) -t $(BUILD_IMAGE_REPO)/$*:$(IMAGE_TAG) -f ./images/$*/Dockerfile --load . --no-cache
+
+alauda-ansible-operator-image: export DOCKER_CLI_EXPERIMENTAL = enabled
+alauda-ansible-operator-image:
+	docker buildx build $(DOCKER_PROGRESS) -t $(BUILD_IMAGE_REPO)/ansible-operator:$(IMAGE_TAG) -f ./alauda/Dockerfile --load . --no-cache
+
 ##@ Release
 
 ## TODO: Add release targets here
@@ -160,9 +165,9 @@ test-e2e-teardown: $(KIND)
 $(e2e_targets):: test-e2e-setup
 test-e2e:: $(e2e_tests) ## Run e2e tests
 
-test-e2e-ansible:: image/ansible-operator ## Run Ansible e2e tests
+test-e2e-ansible:: alauda-ansible-operator-image ## Run Ansible e2e tests
 	go test ./test/e2e/ansible -v -ginkgo.v
-test-e2e-ansible-molecule:: install dev-install image/ansible-operator ## Run molecule-based Ansible e2e tests
+test-e2e-ansible-molecule:: install dev-install alauda-ansible-operator-image ## Run molecule-based Ansible e2e tests
 	go run ./hack/generate/samples/molecule/generate.go
 	./hack/tests/e2e-ansible-molecule.sh
 
