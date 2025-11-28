@@ -19,4 +19,13 @@ apko publish \
   ./base.apko.yaml \
   ghcr.io/alauda-mesh/ansible-operator-plugins/runner-base:latest \
   --arch x86_64,aarch64
+
+# 检查 multi-arch
+docker buildx imagetools inspect ghcr.io/alauda-mesh/ansible-operator-plugins/runner-base:latest
+
+# 复制镜像到 build-harbor
+skopeo copy --all \
+  --dest-creds '<harbor_user>:<harbor_password>' \
+  docker://ghcr.io/alauda-mesh/ansible-operator-plugins/runner-base:latest \
+  docker://build-harbor.alauda.cn/asm/ansible-operator-plugins/runner-base:latest
 ```
