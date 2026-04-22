@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21 AS builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22 AS builder
 
 ENV GO111MODULE=on \
     GOFLAGS=-mod=vendor
@@ -9,7 +9,7 @@ RUN cd /go/src/github.com/openshift/ansible-operator-plugins \
     && export GIT_VERSION="$(make -pRrq --no-print-directory | grep '^IMAGE_VERSION' | awk -F'= ' '{print $2}')-ocp" \
     && make -e build
 
-FROM registry.ci.openshift.org/ocp/4.21:base-rhel9
+FROM registry.ci.openshift.org/ocp/4.22:base-rhel9
 
 RUN mkdir -p /etc/ansible \
     && echo "localhost ansible_connection=local" > /etc/ansible/hosts \
@@ -33,6 +33,8 @@ RUN dnf clean all && rm -rf /var/cache/dnf/* \
 ENV REMOTE_SOURCES=${REMOTE_SOURCES:-"./openshift/"}
 ENV REMOTE_SOURCES_DIR=${REMOTE_SOURCES_DIR:-"/cachito"}
 COPY ${REMOTE_SOURCES} ${REMOTE_SOURCES_DIR}
+# Copy our local ansible-runner-http replacement module
+COPY images/ansible-operator/ansible_runner_http /ansible_runner_http
 COPY openshift/install-ansible.sh .
 RUN chmod +x /install-ansible.sh \
     && ./install-ansible.sh

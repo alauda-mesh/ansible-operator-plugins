@@ -30,8 +30,8 @@ fi
 
 "${SED}" -i \
   -e 's/^urllib3==1.*$/urllib3==2.6.3/' \
-  -e 's/^requests==2.*$/requests==2.32.4/' \
-  -e 's/^pyasn1==0.*$/pyasn1==0.6.2/' \
+  -e 's/^requests==2.*$/requests==2.33.0/' \
+  -e 's/^pyasn1==0.*$/pyasn1==0.6.3/' \
   "${SCRIPT_DIR}/openshift/requirements.txt"
 
 "${SED}" -i \

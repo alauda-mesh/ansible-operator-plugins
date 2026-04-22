@@ -6,7 +6,7 @@ ARG RUNNER_BASE_TAG=latest
 FROM cgr.dev/chainguard/wolfi-base AS builder
 
 RUN apk update && \
-    apk add --no-cache build-base curl go-1.23 unzip git
+    apk add --no-cache build-base curl go-1.25 unzip git
 
 ARG GOPROXY
 env GOPROXY=${GOPROXY}
@@ -38,6 +38,8 @@ ENV REMOTE_SOURCES=${REMOTE_SOURCES:-"./alauda/openshift"}
 ENV REMOTE_SOURCES_DIR=${REMOTE_SOURCES_DIR:-"/cachito"}
 
 COPY ${REMOTE_SOURCES} ${REMOTE_SOURCES_DIR}
+# Copy our local ansible-runner-http replacement module
+COPY images/ansible-operator/ansible_runner_http /ansible_runner_http
 COPY alauda/openshift/install-ansible.sh .
 RUN sh ./install-ansible.sh
 
@@ -52,8 +54,8 @@ COPY alauda/openshift/release/ansible/ansible_collections ${HOME}/.ansible/colle
 # 为了让扫描器开心做得「必要」修改 :(
 # 这样改 Ansible Operator 可能无法通用了，只能用于 kiali，Be careful
 RUN mkdir -p ${HOME}/.ansible/tmp \
-  && chown -R ${USER_UID}:${USER_UID} ${HOME} \
-  && chmod -R ug+rwx ${HOME}
+    && chown -R ${USER_UID}:${USER_UID} ${HOME} \
+    && chmod -R ug+rwx ${HOME}
 
 WORKDIR ${HOME}
 USER ${USER_UID}
