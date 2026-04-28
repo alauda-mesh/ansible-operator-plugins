@@ -14,22 +14,13 @@ else
   SED="sed"
 fi
 
-# NOTE: 升级 setuptools 的版本，因为 setuptools 引用了低版本的 jaraco.context 和 wheel。
-"${SED}" -i \
-  -e 's/^wheel==0.*$/wheel==0.46.2/' \
-  -e 's/^setuptools==80.9.0$/setuptools==80.10.2/' \
-  "${SCRIPT_DIR}/openshift/requirements-build.txt"
+# NOTE: 如果要修复 `openshift/requirements-build.txt` jaraco.context 和 wheel 的低版本漏洞，要同时升级 setuptools 的版本，因为 setuptools 引用了 jaraco.context 和 wheel。
 
 "${SED}" -i \
-  -e 's/^wheel==0.*$/wheel==0.46.2/' \
-  "${SCRIPT_DIR}/openshift/requirements-build1.txt"
-
-"${SED}" -i \
-  -e 's/^wheel==0.*$/wheel==0.46.2/' \
+  -e 's/^wheel==0.*$/wheel==0.46.3/' \
   "${SCRIPT_DIR}/openshift/requirements-pre-build.txt"
 
 "${SED}" -i \
-  -e 's/^urllib3==1.*$/urllib3==2.6.3/' \
   -e 's/^requests==2.*$/requests==2.33.0/' \
   -e 's/^pyasn1==0.*$/pyasn1==0.6.3/' \
   "${SCRIPT_DIR}/openshift/requirements.txt"

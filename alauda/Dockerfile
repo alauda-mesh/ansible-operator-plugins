@@ -6,7 +6,7 @@ ARG RUNNER_BASE_TAG=latest
 FROM cgr.dev/chainguard/wolfi-base AS builder
 
 RUN apk update && \
-    apk add --no-cache build-base curl go-1.25 unzip git
+    apk add --no-cache build-base curl go-1.26 unzip git
 
 ARG GOPROXY
 env GOPROXY=${GOPROXY}
