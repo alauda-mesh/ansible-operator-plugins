@@ -86,3 +86,105 @@ jobs:
               echo "$VULNS_MD"
             } >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  build:
+    name: 构建并推送到 GHCR
+    needs: precheck
+    if: needs.precheck.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Build and publish to GHCR
+        uses: chainguard-images/actions/apko-publish@main
+        with:
+          config: alauda/base.apko.yaml
+          tag: ${{ env.GHCR_IMAGE }}:latest
+          generic-user: ${{ github.repository_owner }}
+          generic-pass: ${{ secrets.GITHUB_TOKEN }}
+          annotations: org.opencontainers.image.source:https://github.com/${{ github.repository }}
+
+  sync-verify:
+    name: 同步到 Harbor 并复扫
+    needs: [precheck, build]
+    if: needs.precheck.outputs.should_build == 'true'
+    runs-on: [self-hosted, linux, x64]
+    env:
+      http_proxy: ${{ vars.HTTP_PROXY }}
+      https_proxy: ${{ vars.HTTPS_PROXY }}
+      no_proxy: ${{ vars.NO_PROXY }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login Harbor
+        uses: docker/login-action@v4
+        with:
+          registry: build-harbor.alauda.cn
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: 同步 GHCR → Harbor
+        run: |
+          set -euo pipefail
+          # 多架构 manifest + 跨 registry blob 拷贝(与 istio-base-images sync-harbor 同款)
+          docker buildx imagetools create \
+            --tag "${HARBOR_IMAGE}:latest" \
+            "${GHCR_IMAGE}:latest"
+
+      - name: 复扫新镜像(按 digest)
+        id: rescan
+        if: needs.precheck.outputs.vuln_check == 'true'
+        run: |
+          set -euo pipefail
+          # 取新镜像的不可变 digest,避免复用 latest tag 命中扫描服务脏缓存
+          digest="$(docker buildx imagetools inspect "${HARBOR_IMAGE}:latest" --format '{{.Manifest.Digest}}')"
+          case "$digest" in
+            sha256:*) ;;
+            *) echo "无法解析镜像 digest: '${digest}'" >&2; exit 1 ;;
+          esac
+          echo "新镜像 digest: ${digest}"
+          .github/scripts/scan-image.sh "${HARBOR_IMAGE}@${digest}"
+
+      - name: 汇报复扫结果
+        if: needs.precheck.outputs.vuln_check == 'true'
+        env:
+          RESCAN_CLEAN: ${{ steps.rescan.outputs.clean }}
+          RESCAN_VULNS_MD: ${{ steps.rescan.outputs.vulns_md }}
+        run: |
+          set -euo pipefail
+          if [ "$RESCAN_CLEAN" = "true" ]; then
+            {
+              echo "## runner-base 重建复扫"
+              echo "重建后镜像 \`${HARBOR_IMAGE}:latest\` 无漏洞，已修复。"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "## runner-base 重建复扫"
+              echo "重建后镜像 \`${HARBOR_IMAGE}:latest\` **仍存在漏洞**："
+              echo ""
+              echo "$RESCAN_VULNS_MD"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: 汇报(未执行漏洞检查)
+        if: needs.precheck.outputs.vuln_check != 'true'
+        run: |
+          set -euo pipefail
+          {
+            echo "## runner-base 构建"
+            echo "已构建并同步到 GHCR 与 build-harbor(tag: latest)，未执行漏洞检查。"
+          } >> "$GITHUB_STEP_SUMMARY"
