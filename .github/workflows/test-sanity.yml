@@ -7,12 +7,12 @@ jobs:
     name: sanity
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
-    - uses: actions/setup-go@v6
-      with:
-        go-version-file: "go.mod"
-      id: go
-    - run: sudo rm -rf /usr/local/bin/kustomize
-    - run: make test-sanity
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+        id: go
+      - run: sudo rm -rf /usr/local/bin/kustomize
+      - run: make test-sanity
