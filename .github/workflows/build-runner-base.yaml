@@ -114,6 +114,9 @@ jobs:
     needs: [precheck, build]
     if: needs.precheck.outputs.should_build == 'true'
     runs-on: [self-hosted, linux, x64]
+    permissions:
+      contents: read
+      packages: read
     env:
       http_proxy: ${{ vars.HTTP_PROXY }}
       https_proxy: ${{ vars.HTTPS_PROXY }}
