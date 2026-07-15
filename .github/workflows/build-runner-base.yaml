@@ -1,0 +1,88 @@
+name: Build runner-base image
+
+on:
+  schedule:
+    - cron: '0 23 * * 4'   # 周四 23:00 UTC = 周五 07:00 北京时间(UTC+8)
+  workflow_dispatch:
+    inputs:
+      vulnerability_check:
+        description: '是否进行镜像漏洞检查'
+        type: boolean
+        default: true
+
+env:
+  GHCR_IMAGE: ghcr.io/alauda-mesh/ansible-operator-plugins/runner-base
+  HARBOR_IMAGE: build-harbor.alauda.cn/asm/ansible-operator-plugins/runner-base
+  SCAN_API: http://192.168.25.100:8888
+
+concurrency:
+  group: build-runner-base
+  cancel-in-progress: false
+
+jobs:
+  precheck:
+    name: 检查当前镜像漏洞
+    runs-on: [self-hosted, linux, x64]
+    env:
+      http_proxy: ${{ vars.HTTP_PROXY }}
+      https_proxy: ${{ vars.HTTPS_PROXY }}
+      no_proxy: ${{ vars.NO_PROXY }}
+    outputs:
+      should_build: ${{ steps.decide.outputs.should_build }}
+      vuln_check: ${{ steps.determine.outputs.vuln_check }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: 确定是否进行漏洞检查
+        id: determine
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_CHECK: ${{ inputs.vulnerability_check }}
+        run: |
+          set -euo pipefail
+          # 定时触发强制检查;手动触发取输入(默认 true)
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            vuln_check=true
+          else
+            vuln_check="$INPUT_CHECK"
+          fi
+          echo "vuln_check=${vuln_check}" >> "$GITHUB_OUTPUT"
+          echo "vuln_check=${vuln_check}"
+
+      - name: 扫描当前镜像
+        id: scan
+        if: steps.determine.outputs.vuln_check == 'true'
+        run: |
+          set -euo pipefail
+          .github/scripts/scan-image.sh "${HARBOR_IMAGE}:latest"
+
+      - name: 决定是否构建并写 Summary
+        id: decide
+        env:
+          VULN_CHECK: ${{ steps.determine.outputs.vuln_check }}
+          SCAN_CLEAN: ${{ steps.scan.outputs.clean }}
+          VULNS_MD: ${{ steps.scan.outputs.vulns_md }}
+        run: |
+          set -euo pipefail
+          if [ "$VULN_CHECK" != "true" ]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "## runner-base 构建"
+              echo "已跳过漏洞检查，直接重建。"
+            } >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$SCAN_CLEAN" = "true" ]; then
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## runner-base 漏洞检查"
+              echo "当前镜像 \`${HARBOR_IMAGE}:latest\` 无漏洞，流水线停止。"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "## runner-base 漏洞检查"
+              echo "当前镜像 \`${HARBOR_IMAGE}:latest\` 发现漏洞，将重建："
+              echo ""
+              echo "$VULNS_MD"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
