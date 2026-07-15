@@ -155,8 +155,11 @@ jobs:
         if: needs.precheck.outputs.vuln_check == 'true'
         run: |
           set -euo pipefail
-          # 取新镜像的不可变 digest,避免复用 latest tag 命中扫描服务脏缓存
-          digest="$(docker buildx imagetools inspect "${HARBOR_IMAGE}:latest" --format '{{.Manifest.Digest}}')"
+          # 取新镜像的不可变 index digest,避免复用 latest tag 命中扫描服务脏缓存。
+          # 不用 --format '{{.Manifest.Digest}}':该 runner 的 buildx 不支持该模板,会回退打印默认全文。
+          # 改从默认 inspect 输出解析顶层 "Digest:" 行(行首锚定,只取第一条 index digest)。
+          # 已实测:awk 解析正确、扫描 API 接受 @sha256: digest 引用。
+          digest="$(docker buildx imagetools inspect "${HARBOR_IMAGE}:latest" | awk '/^Digest:/{print $2; exit}')"
           case "$digest" in
             sha256:*) ;;
             *) echo "无法解析镜像 digest: '${digest}'" >&2; exit 1 ;;
