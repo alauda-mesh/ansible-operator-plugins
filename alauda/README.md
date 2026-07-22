@@ -35,3 +35,19 @@ skopeo copy --all \
   docker://ghcr.io/alauda-mesh/ansible-operator-plugins/runner-base:latest \
   docker://build-harbor.alauda.cn/asm/ansible-operator-plugins/runner-base:latest
 ```
+
+## 版本升级
+
+使用仓库内置的 Claude Code skill [`sync-upstream`](../.claude/skills/sync-upstream/SKILL.md) 同步上游 [openshift/ansible-operator-plugins](https://github.com/openshift/ansible-operator-plugins) 代码（仅支持显式调用）。它会自动完成：
+
+1. 基于目标分支创建 `sync/<日期>` 分支并 merge 上游（冲突时停下询问）
+2. 分析上游 `openshift/Dockerfile` 新改动，同步到 `alauda/Dockerfile` 并给出理由
+3. 清理 `alauda/patch.sh` 中已过时的 python 库版本 patch
+4. 汇报同步后的版本（`internal/version/version.go` 的 `ImageVersion`）
+5. 创建 PR 并监控 Alauda Release 流水线，失败时分析原因
+
+使用示例（在 Claude Code 中，参数为 `<上游分支> <目标分支>`）：
+
+```
+/sync-upstream main main
+```
