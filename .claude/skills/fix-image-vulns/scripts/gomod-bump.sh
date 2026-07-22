@@ -28,7 +28,12 @@ echo "==> go build ./... （验证构建）"
 go build ./...
 
 echo "==> 变更概览:"
-git status --short | head -30
-TOTAL="$(git status --short | wc -l)"
-[[ "${TOTAL}" -gt 30 ]] && echo "    ...（共 ${TOTAL} 个文件变更，多为 vendor/ 同步产生）"
+# vendor 同步的变更常达数千行，git status 直接管给 head 会被截断触发 SIGPIPE，
+# 在 set -o pipefail 下使脚本以 141 退出（此时构建其实已成功）——先落变量再截取
+STATUS="$(git status --short)"
+sed -n '1,30p' <<< "${STATUS}"
+TOTAL="$(wc -l <<< "${STATUS}")"
+if [[ "${TOTAL}" -gt 30 ]]; then
+  echo "    ...（共 ${TOTAL} 个文件变更，多为 vendor/ 同步产生）"
+fi
 echo "RESULT: BUILD_OK"
