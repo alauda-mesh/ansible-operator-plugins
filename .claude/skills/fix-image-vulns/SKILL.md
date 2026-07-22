@@ -71,6 +71,11 @@ bash "$SKILL_DIR/scripts/gomod-bump.sh" <module@version> [module@version ...]
 
 脚本执行 go get → tidy → vendor → build 并验证构建。构建失败时分析原因（常见：依赖间版本冲突、新版本要求更高 go 版本、API 变更导致编译错误），能明确解决就解决，拿不准就带着报错向用户提问，不要凭猜测大版本连锁升级。
 
+两类高频版本约束报错的标准处理（扫描器给的修复候选是"修该 CVE 的最低版本"，可能低于依赖间的实际约束）：
+
+- `go get` 报 `A@vX requires B@vY, not B@vZ`：把 B 的目标版本提到报错要求的 vY 重跑即可（vY 高于修复候选，CVE 覆盖不受影响）。`golang.org/x/*` 系列互相牵制，多包同升时常见；
+- 同一发布系列的包（如 `go.opentelemetry.io/otel` 与 `otel/sdk`）版本必须对齐：各自修复候选不同时，统一取其中最高者，不要各升各的。
+
 ### 2.3 PYTHON → 通过 alauda/patch.sh 强升
 
 先用 `grep -rn '<包名>==' openshift/requirements*.txt` 确认该包 pin 在哪个文件，然后编辑 `alauda/patch.sh`（参考文件内已有写法和 `git log --oneline -- alauda/patch.sh` 的历史修复记录）：
