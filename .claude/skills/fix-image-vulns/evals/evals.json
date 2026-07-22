@@ -1,0 +1,26 @@
+{
+  "skill_name": "fix-image-vulns",
+  "evals": [
+    {
+      "id": 0,
+      "name": "classify-plan",
+      "prompt": "镜像 build-harbor.alauda.cn/asm/ansible-operator:v1.42.1-r1-pr.21 的漏洞扫描结果在 <WS>/scan-pr21.json（内部扫描服务输出，含 os/lang 两组）。仓库在 /home/vscode/repo/ansible-operator-plugins。请分析这些漏洞并按修复途径分类，给出具体修复计划（每个包升到什么版本、通过仓库的哪个文件/机制修、哪些不需要修），写到 outputs/report.md。只做分析，不要修改仓库任何文件。",
+      "expected_output": "report.md：正确分类 13 条 go 依赖漏洞（go.mod+vendor 途径）与 4 条 python 漏洞（alauda/patch.sh 途径），给出各包目标版本（x/net 需覆盖全部 8 条 CVE 即 0.56.0），指出 ansible-core 修复候选全是 rc 的风险",
+      "files": ["<WS>/scan-pr21.json"]
+    },
+    {
+      "id": 1,
+      "name": "local-fix",
+      "prompt": "仓库副本在 <repo>（ansible-operator-plugins）。镜像扫描发现漏洞，扫描结果在 <WS>/mini-fix.json。请修复这些漏洞：go 依赖漏洞升级后必须验证构建通过（注意该仓库的构建方式）；python 库漏洞通过 alauda/patch.sh 的版本 patch 机制升级并验证生效。不同修复途径分别独立 commit（禁止 git commit --amend）。不要创建 PR、不要 push、不要改动副本仓库之外的文件。修复摘要写到 outputs/report.md。",
+      "expected_output": "go.mod 中 x/text 升到 >= v0.39.0 且 vendor 同步、go build 通过；patch.sh 新增 urllib3==2.7.0 与 idna==3.15 的 sed 行且运行生效；两类修复各自独立 commit",
+      "files": ["<WS>/mini-fix.json"]
+    },
+    {
+      "id": 2,
+      "name": "resolve-scan",
+      "prompt": "Alauda Release 流水线的 run 29894931080（仓库 alauda-mesh/ansible-operator-plugins）构建了一个镜像。请查出它构建的镜像地址，然后用内部扫描服务（http://192.168.25.100:8888，调用方式可参考仓库里 .github/scripts/scan-image.sh）对该镜像做漏洞扫描：原始扫描 JSON 保存到 outputs/scan.json，漏洞摘要（按修复途径/类型分组的计数和关键漏洞列表）写到 outputs/summary.md。仓库在 /home/vscode/repo/ansible-operator-plugins。不要修改仓库任何文件。",
+      "expected_output": "从 run 解析出 build-harbor.alauda.cn/asm/ansible-operator:main；scan.json 为合法扫描结果（17 条漏洞）；summary.md 分组计数正确（go 13 / python 4 / os 0）",
+      "files": []
+    }
+  ]
+}

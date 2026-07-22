@@ -51,3 +51,19 @@ skopeo copy --all \
 ```
 /sync-upstream main main
 ```
+
+## 漏洞修复
+
+使用仓库内置的 Claude Code skill [`fix-image-vulns`](../.claude/skills/fix-image-vulns/SKILL.md) 修复 ansible-operator 镜像漏洞（仅支持显式调用）。它会自动完成：
+
+1. 调内部扫描服务检测镜像漏洞，按修复途径分类（os 级漏洞属 `runner-base`，只报告不修复）
+2. 按类修复：构建 go 版本（`alauda/Dockerfile`）、go.mod 依赖（含 vendor 同步与构建验证）、python 库（`alauda/patch.sh`）
+3. 创建 PR 并监控 Alauda Release 流水线
+4. 对新构建的镜像回归扫描，未清零则继续修（最多 3 轮），修不完如实报告
+
+使用示例（参数为 Alauda Release 流水线 run ID/URL，或完整镜像地址）：
+
+```
+/fix-image-vulns build-harbor.alauda.cn/asm/ansible-operator:main
+/fix-image-vulns 29894931080
+```
