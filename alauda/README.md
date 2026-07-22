@@ -8,6 +8,12 @@
 
 这里的说明可能会过时，主要看看 `patch.sh` 吧
 
+## 流水线构建 `runner-base` 镜像
+
+详见：https://github.com/alauda-mesh/ansible-operator-plugins/actions/workflows/build-runner-base.yaml
+
+该流水线每周会定时构建一次（用于修复最新的漏洞），也可手动执行。
+
 ## 本地构建 `runner-base` 镜像
 
 ```bash

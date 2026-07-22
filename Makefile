@@ -22,8 +22,6 @@ export GO_BUILD_LDFLAGS =  \
     -X '$(REPO)/internal/version.GitCommit=$(GIT_COMMIT)' \
     -X '$(REPO)/internal/version.KubernetesVersion=v$(K8S_VERSION)' \
     -X '$(REPO)/internal/version.ImageVersion=$(IMAGE_VERSION)' \
-    -X runtime.buildVersion=unknown \
-    -X runtime.modinfo= \
  \
 
 GO_BUILD_ARGS = \
