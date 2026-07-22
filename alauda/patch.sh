@@ -25,8 +25,4 @@ fi
   -e 's/^pyasn1==0.*$/pyasn1==0.6.3/' \
   "${SCRIPT_DIR}/openshift/requirements.txt"
 
-"${SED}" -i \
-  -e 's/pipenv check --ignore 71064/pipenv check --ignore 71064 --ignore 77680 --ignore 77744 --ignore 77745/' \
-  "${SCRIPT_DIR}/openshift/Dockerfile.requirements"
-
 diff --color -ruN "${SCRIPT_DIR}/../openshift" "${SCRIPT_DIR}/openshift" || true

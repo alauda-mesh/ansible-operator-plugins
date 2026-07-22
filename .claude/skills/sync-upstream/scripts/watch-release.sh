@@ -25,12 +25,18 @@ BRANCH="${1:-$(git branch --show-current)}"
 command -v gh >/dev/null 2>&1 || die "找不到 gh CLI"
 gh auth status >/dev/null 2>&1 || die "gh 未认证。请提示用户在会话中执行: ! gh auth login"
 
+# 本仓库有 origin/upstream 两个 remote，gh 未 set-default 时会把仓库解析到
+# upstream（openshift），因此所有 gh 命令显式指定 --repo（从 origin URL 推导）
+ORIGIN_URL="$(git remote get-url origin 2>/dev/null)" || die "找不到 origin remote"
+REPO_SLUG="$(sed -E 's#^(https://[^/]+/|git@[^:]+:|ssh://git@[^/]+(:[0-9]+)?/)##; s#\.git$##' <<<"${ORIGIN_URL}")"
+[[ "${REPO_SLUG}" == */* ]] || die "无法从 origin URL 解析仓库名: ${ORIGIN_URL}"
+
 # 等待 run 出现（push/PR 刚创建时 run 可能尚未注册）
 echo "==> 等待分支 ${BRANCH} 上的 '${WORKFLOW}' run 出现（最长 ${APPEAR_TIMEOUT}s）..."
 START="$(date +%s)"
 RUN_ID=""
 while :; do
-  RUN_ID="$(gh run list --workflow "${WORKFLOW}" --branch "${BRANCH}" --limit 1 \
+  RUN_ID="$(gh run list --repo "${REPO_SLUG}" --workflow "${WORKFLOW}" --branch "${BRANCH}" --limit 1 \
     --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)"
   [[ -n "${RUN_ID}" ]] && break
   if (( $(date +%s) - START > APPEAR_TIMEOUT )); then
@@ -42,14 +48,14 @@ while :; do
   sleep 10
 done
 
-RUN_URL="$(gh run view "${RUN_ID}" --json url --jq .url)"
+RUN_URL="$(gh run view --repo "${REPO_SLUG}" "${RUN_ID}" --json url --jq .url)"
 echo "==> 发现 run ${RUN_ID}: ${RUN_URL}"
 
 # 轮询直至完成或超时
 START="$(date +%s)"
 LAST_STATUS=""
 while :; do
-  read -r STATUS CONCLUSION < <(gh run view "${RUN_ID}" --json status,conclusion \
+  read -r STATUS CONCLUSION < <(gh run view --repo "${REPO_SLUG}" "${RUN_ID}" --json status,conclusion \
     --jq '"\(.status) \(.conclusion // "-")"' 2>/dev/null || echo "unknown -")
   if [[ "${STATUS}" != "${LAST_STATUS}" ]]; then
     echo "[$(date +%H:%M:%S)] status=${STATUS}"
@@ -64,8 +70,9 @@ while :; do
 done
 
 if [[ "${CONCLUSION}" == "success" ]]; then
-  # 从日志中提取产物镜像名（Output image 步骤输出的 BUILD_IMAGE=）
-  IMAGE="$(gh run view "${RUN_ID}" --log 2>/dev/null | grep -m1 -oE 'BUILD_IMAGE=\S+' | cut -d= -f2- || true)"
+  # 从日志中提取产物镜像名（Output image 步骤输出的 BUILD_IMAGE=）；
+  # 排除以 $ 或 " 开头的值，跳过 Actions 日志里未展开的命令回显 echo "BUILD_IMAGE=${IMAGE}"
+  IMAGE="$(gh run view --repo "${REPO_SLUG}" "${RUN_ID}" --log 2>/dev/null | grep -m1 -oE 'BUILD_IMAGE=[^"$[:space:]]\S*' | cut -d= -f2- || true)"
   echo "==> RESULT: PIPELINE_SUCCESS ${RUN_URL}"
   [[ -n "${IMAGE}" ]] && echo "==> 构建镜像: ${IMAGE}"
   exit 0
@@ -73,8 +80,8 @@ fi
 
 echo "==> RESULT: PIPELINE_FAILED conclusion=${CONCLUSION} ${RUN_URL}"
 echo "==> 失败 job/step 概览："
-gh run view "${RUN_ID}" 2>/dev/null | grep -E "^(X|✓|-|\*)" | head -20 || true
+gh run view --repo "${REPO_SLUG}" "${RUN_ID}" 2>/dev/null | grep -E "^(X|✓|-|\*)" | head -20 || true
 echo ""
-echo "==> 失败日志摘要（最后 120 行，完整日志用: gh run view ${RUN_ID} --log-failed）："
-gh run view "${RUN_ID}" --log-failed 2>/dev/null | tail -120 || echo "（拉取失败日志出错，请手动查看 ${RUN_URL}）"
+echo "==> 失败日志摘要（最后 120 行，完整日志用: gh run view --repo ${REPO_SLUG} ${RUN_ID} --log-failed）："
+gh run view --repo "${REPO_SLUG}" "${RUN_ID}" --log-failed 2>/dev/null | tail -120 || echo "（拉取失败日志出错，请手动查看 ${RUN_URL}）"
 exit 2
