@@ -21,8 +21,12 @@ fi
   "${SCRIPT_DIR}/openshift/requirements-pre-build.txt"
 
 "${SED}" -i \
+  -e 's/^setuptools==.*$/setuptools==83.0.0/' \
+  "${SCRIPT_DIR}/openshift/requirements-build.txt"
+
+"${SED}" -i \
   -e 's/^requests==2.*$/requests==2.33.0/' \
-  -e 's/^pyasn1==0.*$/pyasn1==0.6.3/' \
+  -e 's/^pyasn1==0.*$/pyasn1==0.6.4/' \
   -e 's/^idna==3.*$/idna==3.15/' \
   -e 's/^urllib3==2.*$/urllib3==2.7.0/' \
   -e 's/^ansible-core==2.*$/ansible-core==2.18.18/' \
