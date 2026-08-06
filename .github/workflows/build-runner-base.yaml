@@ -2,7 +2,11 @@ name: Build runner-base image
 
 on:
   schedule:
-    - cron: "0 23 * * 4" # 周四 23:00 UTC = 周五 07:00 北京时间(UTC+8)
+    # 周四 22:47 UTC = 周五 06:47 北京时间(UTC+8)，实际执行贴近预期的周五早 07:00；
+    # 与 istio-base-images 的 cve-check(23:47 UTC)保持错峰 1 小时。
+    # 不用整点：GitHub 定时任务在每小时整点排队严重，
+    # 此前 "0 23 * * 4" 实测每周延迟约 50 分钟(北京时间 ~07:50 才触发)
+    - cron: "47 22 * * 4"
   workflow_dispatch:
     inputs:
       vulnerability_check:
@@ -13,7 +17,9 @@ on:
 env:
   GHCR_IMAGE: ghcr.io/alauda-mesh/ansible-operator-plugins/runner-base
   HARBOR_IMAGE: build-harbor.alauda.cn/asm/ansible-operator-plugins/runner-base
-  SCAN_API: http://192.168.25.100:8888
+  # 镜像扫描服务主备地址：优先用主，主不可达或连续失败时自动切备(切换逻辑见 .github/scripts/scan-image.sh)
+  SCAN_API_PRIMARY: http://192.168.141.42:8888
+  SCAN_API_BACKUP: http://192.168.25.100:8888
 
 concurrency:
   group: build-runner-base
@@ -23,7 +29,8 @@ jobs:
   precheck:
     name: 检查当前镜像漏洞
     runs-on: [self-hosted, linux, x64]
-    timeout-minutes: 30
+    # 最坏情形为主备两个服务各重试 3 次(每次超时 300s)，约 32 分钟，30 分钟不够用
+    timeout-minutes: 45
     env:
       http_proxy: ${{ vars.HTTP_PROXY }}
       https_proxy: ${{ vars.HTTPS_PROXY }}
