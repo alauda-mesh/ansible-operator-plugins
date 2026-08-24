@@ -53,7 +53,12 @@ bash "$SKILL_DIR/scripts/classify-vulns.sh" <scratchpad>/scan-round1.json
 git fetch origin && git checkout -b fix/image-vulns-$(date +%F) origin/main
 ```
 
-按分类逐项修复。参考分类输出中"按包聚合"一节确定每个包的目标版本：同一库有多个修复候选时，选**能覆盖该库全部 CVE 的最低稳定版本**（保守升级，减少破坏性）。候选全是 rc/预发布版本时，先查上游是否已发布对应稳定版——扫描库的 FixedVersion 常滞后于实际发布（python 包：`curl -s https://pypi.org/pypi/<包名>/json | jq -r '.releases | keys[]' | sort -V | tail`）；有稳定版就用稳定版，确实只有预发布时停下来问用户（pin 预发布有稳定性风险）。
+按分类逐项修复。参考分类输出中"按包聚合"一节确定每个包的目标版本：同一库有多个修复候选时，选**能覆盖该库全部 CVE 的最低稳定版本**（保守升级，减少破坏性）。候选全是 rc/预发布版本时，先查上游是否已发布对应稳定版——扫描库的 FixedVersion 常滞后于实际发布；有稳定版就用稳定版，确实只有预发布时停下来问用户（pin 预发布有稳定性风险）。
+
+查上游可用版本：
+
+- python 包：`curl -s https://pypi.org/pypi/<包名>/json | jq -r '.releases | keys[]' | sort -V | tail`
+- go 模块：`GOFLAGS=-mod=mod go list -m -versions <module>`。本仓库是 vendor 模式，**不加 `-mod=mod` 时该命令不会列版本，而是打印 "available versions using the vendor directory (Use -mod=mod ...)" 的报错**，容易被误读成"查不到版本"；再用 `curl -s https://goproxy.cn/<module>/@v/<version>.mod | head -5` 确认目标版本的 `go` 指令要求不高于构建用 go 版本
 
 ### 2.1 GO_STDLIB → 升级构建 go 版本
 

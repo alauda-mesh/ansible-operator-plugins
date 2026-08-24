@@ -17,6 +17,9 @@ command -v go >/dev/null 2>&1 || die "找不到 go 工具链"
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "当前目录不在 git 仓库内"
 cd "${REPO_ROOT}"
 export GOPROXY="${GOPROXY:-https://goproxy.cn,direct}"
+# go 全量构建默认按核数并行可能会顶满内存并拖垮机器，
+# 默认限制并行度（内存充裕时可用 GOMAXPROCS 覆盖）
+export GOMAXPROCS="${GOMAXPROCS:-4}"
 
 echo "==> go get $*"
 go get "$@"
