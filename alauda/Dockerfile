@@ -5,8 +5,33 @@ ARG RUNNER_BASE_TAG=latest
 
 FROM cgr.dev/chainguard/wolfi-base AS builder
 
-RUN apk update && \
-    apk add --no-cache build-base curl go-1.26 unzip git
+# 构建阶段只负责编译出 ansible-operator 二进制，最终镜像仅 COPY 该二进制，
+# 因此这里装什么都不会影响发布镜像的内容与漏洞扫描结果。
+#
+# 依赖说明：
+#   bash    —— Makefile 第 1 行强制 `SHELL = /bin/bash`，而 wolfi-base 只带 busybox sh，
+#              缺失时 make 会报 `/bin/bash: No such file or directory` 并以 Error 127 退出
+#   make    —— 执行 `make -e build`
+#   git     —— Makefile 用 git describe / git rev-parse 生成版本信息
+#   go-1.26 —— 编译二进制
+#
+# 刻意不再安装 build-base：Makefile 已设置 `CGO_ENABLED = 0`，gcc/binutils/glibc-dev 等
+# C 工具链完全用不到。去掉后 apk 下载量从约 670 MiB 降到约 200 MiB，构建更快，
+# 暴露在网络抖动下的时间窗口也大幅缩短。curl/unzip 在本阶段同样无人使用，一并去掉。
+#
+# apk.cgr.dev 偶发单个包下载中断（`ERROR: <pkg>: IO ERROR`），只要有一个包出错整条命令
+# 就会退出 1 导致构建失败，因此加上退避重试。
+RUN set -eu; \
+    for i in 1 2 3 4 5; do \
+        if apk update && apk add --no-cache bash make git go-1.26; then \
+            exit 0; \
+        fi; \
+        [ "${i}" -lt 5 ] || break; \
+        echo "apk 安装失败（第 ${i}/5 次尝试），$((i * 10)) 秒后重试" >&2; \
+        sleep "$((i * 10))"; \
+    done; \
+    echo "apk 安装连续 5 次均失败，终止构建" >&2; \
+    exit 1
 
 ARG GOPROXY
 env GOPROXY=${GOPROXY}

@@ -81,6 +81,7 @@ jobs:
           file: alauda/Dockerfile
           build-args: |-
             RUNNER_BASE_REPO=build-harbor.alauda.cn/asm/ansible-operator-plugins/runner-base
+            GOPROXY=${{ env.GOPROXY }}
           tags: |-
             ${{ env.IMAGE_REPOSITORY }}:${{ env.IMAGE_TAG }}
         env:
